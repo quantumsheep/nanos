@@ -113,6 +113,7 @@ closure_function(4, 2, void, fsstarted,
                  heap, h, u8 *, mbr, block_io, r, block_io, w,
                  filesystem, fs, status, s)
 {
+    out8(0xf4, 54);
     if (!is_ok(s))
         halt("unable to open filesystem: %v\n", s);
     if (root_fs)
@@ -123,13 +124,16 @@ closure_function(4, 2, void, fsstarted,
     tuple root = filesystem_getroot(fs);
     storage_set_root_fs(fs);
     tuple mounts = table_find(root, sym(mounts));
+    out8(0xf4, 55);
     if (mounts && (tagof(mounts) == tag_tuple))
         storage_set_mountpoints(mounts);
+    out8(0xf4, 56);
     if (mbr) {
         struct partition_entry *bootfs_part;
         if (table_find(root, sym(ingest_kernel_symbols)) &&
                 (bootfs_part = partition_get(mbr, PARTITION_BOOTFS))) {
             init_debug("loading boot filesystem");
+            out8(0xf4, 57);
             create_filesystem(h, SECTOR_SIZE,
                               bootfs_part->nsectors * SECTOR_SIZE,
                               closure(h, offset_block_io,
@@ -140,7 +144,9 @@ closure_function(4, 2, void, fsstarted,
         deallocate(h, mbr, SECTOR_SIZE);
     }
     root_fs = fs;
+    out8(0xf4, 58);
     enqueue(runqueue, create_init(&heaps, root, fs));
+    out8(0xf4, 59);
     closure_finish();
 }
 
@@ -170,6 +176,7 @@ static void rootfs_init(heap h, u8 *mbr, u64 offset,
                         block_io r, block_io w, u64 length)
 {
     length -= offset;
+    out8(0xf4, 53);
     create_filesystem(h,
                       SECTOR_SIZE,
                       length,
@@ -183,6 +190,7 @@ closure_function(5, 1, void, mbr_read,
                  heap, h, u8 *, mbr, block_io, r, block_io, w, u64, length,
                  status, s)
 {
+    out8(0xf4, 52);
     if (!is_ok(s)) {
         msg_err("unable to read partitions: %v\n", s);
         goto out;
@@ -209,6 +217,7 @@ closure_function(5, 1, void, mbr_read,
 closure_function(0, 3, void, attach_storage,
                  block_io, r, block_io, w, u64, length)
 {
+    out8(0xf4, 50);
     heap h = heap_general(&heaps);
 
     /* Look for partition table */
@@ -223,6 +232,7 @@ closure_function(0, 3, void, attach_storage,
         deallocate(h, mbr, SECTOR_SIZE);
         return;
     }
+    out8(0xf4, 51);
     apply(r, mbr, irange(0, 1), sh);
 }
 
@@ -402,12 +412,16 @@ static void __attribute__((noinline)) init_service_new_stack()
         halt("xsave not supported\n");
     }
 #endif
+    out8(0xf4, 35);
     init_pci(kh);
     init_console(kh);
     init_symtab(kh);
+    out8(0xf4, 36);
     read_kernel_syms();
+    out8(0xf4, 37);
     init_debug("pci_discover (for VGA)");
     pci_discover(); // early PCI discover to configure VGA console
+    out8(0xf4, 38);
     init_kernel_contexts(backed);
 
     /* interrupts */
@@ -417,7 +431,9 @@ static void __attribute__((noinline)) init_service_new_stack()
     // ipi..i guess this is safe because they are disabled?
     init_debug("init_scheduler");    
     init_scheduler(misc);
+    out8(0xf4, 39);
     init_clock();               /* must precede platform init */
+    out8(0xf4, 40);
 
     /* platform detection and early init */
     init_debug("probing for KVM");
@@ -440,6 +456,7 @@ static void __attribute__((noinline)) init_service_new_stack()
         init_debug("KVM detected");
     }
 
+    out8(0xf4, 42);
     /* RNG, stack canaries */
     init_debug("RNG");
     init_hwrand();
@@ -450,6 +467,7 @@ static void __attribute__((noinline)) init_service_new_stack()
     init_debug("LWIP init");
     init_net(kh);
 
+    out8(0xf4, 44);
     init_debug("probe fs, register storage drivers");
     init_volumes(misc);
     storage_attach sa = closure(misc, attach_storage);
@@ -476,10 +494,13 @@ static void __attribute__((noinline)) init_service_new_stack()
         init_vmxnet3_network(kh);
     }
 
+    out8(0xf4, 46);
     init_storage(kh, sa, !xen_detected() && !hyperv_storvsc_attached);
 
     init_debug("pci_discover (for virtio & ata)");
+    out8(0xf4, 47);
     pci_discover(); // do PCI discover again for other devices
+    out8(0xf4, 48);
 
     /* Switch to stage3 GDT64, enable TSS and free up initial map */
     init_debug("install GDT64 and TSS");
@@ -493,6 +514,7 @@ static void __attribute__((noinline)) init_service_new_stack()
     init_debug("total CPUs %d\n", total_processors);
 #endif
     init_debug("starting runloop");
+    out8(0xf4, 49);
     runloop();
 }
 
@@ -605,6 +627,7 @@ static void cmdline_parse(const char *cmdline)
 // init linker set
 void init_service(u64 rdi, u64 rsi)
 {
+    out8(0xf4, 30);
     init_debug("init_service");
     u8 *params = pointer_from_u64(rsi);
     const char *cmdline = 0;
@@ -678,6 +701,7 @@ void init_service(u64 rdi, u64 rsi)
         initial_pages_region->length = INITIAL_PAGES_SIZE;
         mov_to_cr("cr3", pgdir);
     }
+    out8(0xf4, 31);
     u64 cr;
     mov_from_cr("cr0", cr);
     cr |= C0_MP;
@@ -686,12 +710,15 @@ void init_service(u64 rdi, u64 rsi)
     mov_from_cr("cr4", cr);
     cr |= CR4_OSFXSR | CR4_OSXMMEXCPT /* | CR4_OSXSAVE */;
     mov_to_cr("cr4", cr);
+    out8(0xf4, 32);
     init_kernel_heaps();
+    out8(0xf4, 33);
     if (cmdline)
         cmdline_parse(cmdline);
     u64 stack_size = 32*PAGESIZE;
     u64 stack_location = allocate_u64(heap_backed(&heaps), stack_size);
     stack_location += stack_size - STACK_ALIGNMENT;
     *(u64 *)stack_location = 0;
+    out8(0xf4, 34);
     switch_stack(stack_location, init_service_new_stack);
 }

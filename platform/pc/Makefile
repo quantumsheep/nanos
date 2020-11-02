@@ -210,7 +210,9 @@ mkfs vdsogen:
 boot:
 	$(Q) $(MAKE) -C boot
 
+# XXX strip kernel of debug info
 kernel: $(PROG-kernel.img) $(OBJDIR)/kernel.dis
+	strip -g $(PROG-kernel.img)
 
 target:
 ifeq ($(TARGET),)

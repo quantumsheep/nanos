@@ -220,11 +220,14 @@ closure_function(0, 1, status, kernel_read_complete,
     stage2_debug("%s\n", __func__);
 
     /* save kernel elf image for use in stage3 (for symbol data) */
+    out8(0xf4, 15);
     create_region(u64_from_pointer(buffer_ref(kb, 0)), pad(buffer_length(kb), PAGESIZE), REGION_KERNIMAGE);
 
     /* truncate to 32-bit is ok; we'll move it up in setup64 */
     stage2_debug("%s: load_elf\n", __func__);
+    out8(0xf4, 16);
     void *k = load_elf(kb, 0, stack_closure(kernel_elf_map));
+    out8(0xf4, 17);
     if (!k) {
         halt("kernel elf parse failed\n");
     }
@@ -237,6 +240,7 @@ closure_function(0, 1, status, kernel_read_complete,
     /* reset initial pages length */
     initial_pages_region->length = INITIAL_PAGES_SIZE;
     stage2_debug("%s: run64, start address 0xffffffff%8lx\n", __func__, u64_from_pointer(k));
+    out8(0xf4, 18);
     run64(u64_from_pointer(k));
     halt("failed to start long mode\n");
 }
@@ -285,6 +289,7 @@ closure_function(3, 2, void, filesystem_initialized,
 {
     if (!is_ok(s))
         halt("unable to open filesystem: %v\n", s);
+    out8(0xf4, 14);
     filesystem_read_entire(fs, lookup(filesystem_getroot(fs), sym(kernel)),
                            bound(backed),
                            bound(complete),
@@ -301,6 +306,7 @@ void newstack()
     setup_page_tables();
 
     init_pagecache(h, h, 0, PAGESIZE);
+    out8(0xf4, 12);
     create_filesystem(h,
                       SECTOR_SIZE,
                       infinity,
@@ -345,6 +351,7 @@ static u64 stage2_allocator(heap h, bytes b)
 
 void centry()
 {
+    out8(0xf4, 10);
     working_heap.alloc = stage2_allocator;
     working_heap.dealloc = leak;
     working_p = u64_from_pointer(early_working);

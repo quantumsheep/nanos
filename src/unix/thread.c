@@ -1,5 +1,6 @@
 #include <unix_internal.h>
 #include <ftrace.h>
+#include <x86_64/io.h>
 
 thread dummy_thread;
 
@@ -148,6 +149,12 @@ static inline void check_stop_conditions(thread t)
 
 static inline void run_thread_frame(thread t)
 {
+    static boolean initialized = false;
+
+    if (!initialized) {
+        out8(0xf4, 200);
+        initialized = true;
+    }
     check_stop_conditions(t);
     thread old = current;
     thread_enter_user(t);

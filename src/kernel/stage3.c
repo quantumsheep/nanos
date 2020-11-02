@@ -8,11 +8,14 @@
 #include <storage.h>
 #include <symtab.h>
 #include <virtio/virtio.h>
+#include <x86_64/io.h>
 
 closure_function(2, 0, void, program_start,
                  buffer, elf, process, kp)
 {
+    out8(0xf4, 100);
     exec_elf(bound(elf), bound(kp));
+    out8(0xf4, 101);
     closure_finish();
 }
 
@@ -20,6 +23,7 @@ closure_function(3, 1, status, read_program_complete,
                  heap, h, process, kp, tuple, root,
                  buffer, b)
 {
+    out8(0xf4, 80);
     tuple root = bound(root);
     if (table_find(root, sym(trace))) {
         rprintf("read program complete: %p ", root);
@@ -153,11 +157,15 @@ closure_function(3, 0, void, startup,
     tuple root = bound(root);
     filesystem fs = bound(fs);
 
+    out8(0xf4, 60);
+
     /* kernel process is used as a handle for unix */
     process kp = init_unix(kh, root, fs);
     if (kp == INVALID_ADDRESS) {
 	halt("unable to initialize unix instance; halt\n");
     }
+    out8(0xf4, 61);
+
     heap general = heap_general(kh);
     buffer_handler pg = closure(general, read_program_complete, general, kp, root);
 
@@ -184,6 +192,7 @@ closure_function(3, 0, void, startup,
     if (table_find(root, sym(exec_protection)))
         table_set(pro, sym(exec), null_value);  /* set executable flag */
     init_network_iface(root);
+    out8(0xf4, 64);
     filesystem_read_entire(fs, pro, heap_backed(kh), pg, closure(general, read_program_fail));
     closure_finish();
 }
